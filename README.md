@@ -32,9 +32,9 @@ python3 app.py
 - 再次查看Adruino的輸出資訊，如下圖
 - ![post成功](image/post成功.png)
 - 可以看到資料已經資料Post成功
-## 5.網頁渲染結果
+## 4.網頁渲染結果
 - ![網頁GIF](image/網頁_GIF.gif)
-## 6.整體架構
+## 5.整體架構
 - ![整體架構](image/整體架構.jpg)
-## 4.參考資料
+## 6.參考資料
 - https://github.com/sc0210/3311_Lab6_student
