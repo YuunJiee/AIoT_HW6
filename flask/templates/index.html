@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Data Visualization</title>
+    <!-- 引入 Highcharts 库 -->
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/export-data.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="../static/style.css"> 
+</head>
+<body>
+    <div class="main">
+        <!-- 折線圖容器 -->
+        <div class="chart" id="sensor-chart"></div>
+
+        <!-- 控制面板 -->
+        <div class="container">
+            <!-- 切換顯示模式的下拉選單 -->
+            <div class="control-container">
+                <label for="mode-select">顯示模式：</label>
+                <select id="mode-select" onchange="toggleMode()">
+                    <option value="sensor_data" selected>Sensor Data</option>
+                    <option value="random_data">Random Data</option>
+                </select>
+            </div>
+
+            <!-- 輸入框，用於設置更新頻率 -->
+            <div class="control-container">
+                <label for="update-frequency">更新頻率(秒)：</label>
+                <input type="number" id="update-frequency" min="1" value="2" onchange="setUpdateFrequency()">
+            </div>
+
+            <div class="control-container">
+                <label for="display-count">顯示筆數(5-30)：</label>
+                <input type="number" id="display-count" min="5" max="30" value="30" onchange="setDisplayCount()">
+            </div>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="chart" id="data-by-date" ></div>
+        <div class="container">
+            <div class="control-container">
+                <label for="date-input">查詢日期：</label>
+                <input type="date" id="date-input" onchange="getDataByDate()">
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="infoButton">?
+        <span class="tooltiptext">Click to view webpage instructions</span>
+    </div>
+
+    <script>
+        var currentMode = "sensor_data"; // 初始顯示模式
+        var updateInterval = 2000; // 初始更新頻率（毫秒）
+        var currentDisplayCount = 30;
+
+        // 切換顯示模式
+        function toggleMode() {
+            currentMode = document.getElementById("mode-select").value;
+        }
+
+        // 切換顯示筆數
+        function setDisplayCount() {
+            currentDisplayCount = document.getElementById("display-count").value;
+        }
+
+        // 設置更新頻率
+        function setUpdateFrequency() {
+            updateInterval = parseInt(document.getElementById("update-frequency").value) * 1000; // 轉換為毫秒
+        }
+
+        // 函數來更新圖表數據
+        function updateChartData() {
+            // 使用 jQuery 發送 GET 請求獲取數據
+            $.get(`/get_data/Mode=${currentMode}/Count=${currentDisplayCount}`, function(data) {
+
+                // 解析 JSON 數據
+                var temperatureData = [];
+                var humidityData = [];
+                for (var i = 0; i < data.length; i++) {
+                    // x 座標為 1 到 30
+                    temperatureData.push({
+                        x: i + 1,
+                        y: data[i].temperature
+                    });
+                    humidityData.push({
+                        x: i + 1,
+                        y: data[i].humidity
+                    });
+                }
+
+                // 更新圖表數據
+                chart.series[0].setData(temperatureData);
+                chart.series[1].setData(humidityData);
+            });
+        }
+
+        function getToday() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getDataByDate() {
+            var selectedDate = document.getElementById("date-input").value;
+            var mode = document.getElementById("mode-select").value; // Get current mode
+            var url = `/get_data_by_date/Mode=sensor_data/Date=${selectedDate}`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    var resultDiv = document.getElementById("data-by-date");
+                    resultDiv.innerHTML = ""; // Clear previous results
+                    if (data.error) {
+                        resultDiv.innerText = data.error;
+                    } else {
+                        var dataList = data.data;
+                        var temperatureData = [];
+                        var humidityData = [];
+                        console.log(dataList);
+                        dataList.forEach(item => {
+                            temperatureData.push([new Date(item.timestamp).getTime(), item.temperature]);
+                            humidityData.push([new Date(item.timestamp).getTime(), item.humidity]);
+                        });
+                        
+                        Highcharts.chart('data-by-date', {
+                            title: {
+                                text: 'Temperature and Humidity Data for a Specific Day(Only sensor)'
+                            },
+                            xAxis: {
+                                type: 'datetime',
+                                title: {
+                                    text: 'Time'
+                                }
+                            },
+                            yAxis: [{
+                                title: {
+                                    text: 'Temperature (°C)'
+                                }
+                            }, {
+                                title: {
+                                    text: 'Humidity (%)'
+                                },
+                                opposite: true
+                            }],
+                            series: [{
+                                name: 'Temperature',
+                                data: temperatureData
+                            }, {
+                                name: 'Humidity',
+                                data: humidityData,
+                                yAxis: 1
+                            }]
+                        });
+                    }
+                })
+                .catch(error => console.error("Error fetching data:", error));
+        }
+
+
+
+        // 初始化折線圖
+        var chart = Highcharts.chart('sensor-chart', {
+            title: {
+                text: 'Latest Temperature and Humidity Data'
+            },
+            xAxis: {
+                categories: Array.from({length: 30}, (_, i) => (i).toString())
+            },
+            yAxis: [{
+                title: {
+                    text: 'Temperature (°C)'
+                },
+                opposite: false,
+                min: 0,
+                max: 40
+            }, {
+                title: {
+                    text: 'Humidity (%)'
+                },
+                opposite: true,
+                min: 10,
+                max: 80
+            }],
+            series: [{
+                name: 'Temperature',
+                data: []
+            }, {
+                name: 'Humidity',
+                data: [],
+                yAxis: 1
+            }]
+        });
+
+        function showInfo() {
+            var message = "This webpage visualizes sensor data including temperature and humidity. You can switch between sensor data and random data using the dropdown menu. You can also customize the update frequency and the number of data points to display. Use the date input to query data for a specific date.";
+            alert(message);
+        }
+
+        // 每隔一段時間更新一次數據
+        setInterval(updateChartData, updateInterval);
+        document.getElementById("date-input").value = getToday();
+        getDataByDate();
+        document.getElementById("infoButton").addEventListener("click", showInfo);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
